@@ -1,6 +1,16 @@
 {
     "description": "Upstream TAC config changes deliberately not taken into pytactl/tac_configs/. Maintained by scripts/sync_upstream_configs.py; see its docstring. An entry suppresses the upstream-config-sync pull request only while upstream still matches its fingerprint.",
     "differences": {
+        "TAC_FT232H_81.pinout.json": {
+            "note": "Upstream 73eddab renames the Arduino Ventuno Q config from TAC_FT232H_81 to TAC_FT232H_92 and changes its platform_id to 92. pytactl does not use a config for BugHopper boards.",
+            "fingerprint": "removed",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
+        "TAC_FT232H_92.pinout.json": {
+            "note": "Upstream 73eddab renames the Arduino Ventuno Q config from TAC_FT232H_81 to TAC_FT232H_92 and changes its platform_id to 92. pytactl does not use a config for BugHopper boards.",
+            "fingerprint": "sha256:85e63a4e565ab99c0f36e43a8f49e59418c6a58daf6cf2e91c2dbfee16d04479",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
         "TAC_FTDI_16.pinout.json": {
             "note": "Upstream d313724 and 665b842 drop the bootToEDL, bootToEUD, bootToUEFIMenu and bootToFastBoot sequences and add USB disconnect to the power sequences. The shortened usb_descriptor is taken.",
             "fingerprint": "sha256:96abe032a859e181129fe2258b7056d48a90a0fdea2606b146fd504dccbd1c3f",
