@@ -59,8 +59,9 @@ as a draft with the failing tests listed, and the run is marked failed.
 Upstream changes that should stay out of pytactl are listed in
 `scripts/known-config-differences.json`, each with a fingerprint of the upstream
 file it was reviewed against. A listed difference does not trigger a pull
-request until upstream changes that file again. The same comparison runs
-locally:
+request until upstream changes that file again. Entries in the upstream
+`devicelist.json` for configs not vendored here, held back ones included, are
+left out of the catalog. The same comparison runs locally:
 
 ```sh
 git clone https://github.com/qualcomm/qcom-test-automation-controller.git /tmp/qtac

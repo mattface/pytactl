@@ -24,6 +24,11 @@ on to decide whether to open a pull request.
 With --update-known, every current difference is recorded as known instead:
 the way to accept a difference as one to keep out of pytactl.
 
+The upstream device catalog (devicelist.json) is compared without the entries
+whose config the vendored set will not have once the sync is done - configs
+held back as known differences, for one - so that taking a catalog change never
+leaves entries pointing at configs pytactl does not ship.
+
 The provenance annotation ("source") is excluded from the comparison: it names
 the upstream commit, which moves with every upstream push, config change or not.
 """
@@ -114,13 +119,16 @@ def convert_upstream(checkout, destination, commit, repository):
     return result
 
 
-def compare(configs, converted):
+def compare(configs, converted, names=None):
     """Return ``{name: (vendored, upstream)}`` for every file that differs.
 
-    Either side is ``None`` when the file exists only on the other.
+    Either side is ``None`` when the file exists only on the other. ``names``
+    limits the comparison to those files.
     """
+    if names is None:
+        names = (config_names(configs) | config_names(converted)) - LOCAL_ONLY
     differences = {}
-    for name in sorted((config_names(configs) | config_names(converted)) - LOCAL_ONLY):
+    for name in sorted(names):
         vendored_path = os.path.join(configs, name)
         upstream_path = os.path.join(converted, name)
         vendored = load_json(vendored_path) if os.path.exists(vendored_path) else None
@@ -132,6 +140,42 @@ def compare(configs, converted):
         ):
             differences[name] = (vendored, upstream)
     return differences
+
+
+def is_known(entry, upstream):
+    """Whether a known-differences ``entry`` still matches ``upstream``."""
+    return bool(entry) and entry.get("fingerprint") == fingerprint(upstream)
+
+
+def configs_after_sync(configs, converted, applied):
+    """Names of the configs the vendored set has once ``applied`` are taken."""
+    names = {
+        name
+        for name in os.listdir(configs)
+        if name.endswith(tacconfig.PINOUT_EXTENSION)
+    }
+    for name in applied:
+        if os.path.exists(os.path.join(converted, name)):
+            names.add(name)
+        else:
+            names.discard(name)
+    return names
+
+
+def drop_unvendored_catalog_entries(converted, available):
+    """Remove the catalog entries of the converted devicelist.json whose config
+    is not in ``available``, and return those configs' names."""
+    path = os.path.join(converted, DEVICE_LIST)
+    if not os.path.exists(path):
+        return []
+    device_list = load_json(path)
+    catalog = device_list.get("catalog", [])
+    kept = [entry for entry in catalog if entry.get("configPath") in available]
+    if len(kept) == len(catalog):
+        return []
+    device_list["catalog"] = kept
+    write_json(path, device_list)
+    return sorted({entry.get("configPath") for entry in catalog if entry not in kept})
 
 
 def describe(vendored, upstream):
@@ -161,7 +205,9 @@ def dangling_catalog_entries(configs):
     )
 
 
-def write_summary(path, commit, repository, new, known, stale, dangling, known_path):
+def write_summary(
+    path, commit, repository, new, known, stale, left_out, dangling, known_path
+):
     web = repository.removesuffix(".git")
     lines = [
         "Sync of the vendored TAC configs in `pytactl/tac_configs/` with "
@@ -195,6 +241,17 @@ def write_summary(path, commit, repository, new, known, stale, dangling, known_p
         ]
         lines += [f"- `{name}`" for name in stale]
 
+    if left_out:
+        lines += [
+            "",
+            "## Catalog entries left out",
+            "",
+            "Upstream `devicelist.json` lists these configs, which are not "
+            "vendored, so their entries are not taken:",
+            "",
+        ]
+        lines += [f"- `{name}`" for name in left_out]
+
     if dangling:
         lines += [
             "",
@@ -204,9 +261,7 @@ def write_summary(path, commit, repository, new, known, stale, dangling, known_p
         lines += [f"- `{name}`" for name in dangling]
         lines += [
             "",
-            "The catalog was updated but these configs are held back as known "
-            "differences; the bundled-config tests will fail until that is "
-            "resolved.",
+            "The bundled-config tests will fail until that is resolved.",
         ]
 
     relative_known = os.path.relpath(known_path, REPO_ROOT)
@@ -255,13 +310,32 @@ def main():
     with tempfile.TemporaryDirectory(prefix="pytactl-upstream-") as converted:
         convert_upstream(args.checkout, converted, commit, args.repository)
         differences = compare(args.configs, converted)
+        differences.pop(DEVICE_LIST, None)
+
+        # The catalog is compared as it would be taken: without the entries
+        # for configs the vendored set will not have. With --update-known no
+        # config is taken.
+        applied = (
+            []
+            if args.update_known
+            else [
+                name
+                for name, (_, upstream) in differences.items()
+                if not is_known(known_entries.get(name), upstream)
+            ]
+        )
+        left_out = drop_unvendored_catalog_entries(
+            converted, configs_after_sync(args.configs, converted, applied)
+        )
+        differences.update(compare(args.configs, converted, {DEVICE_LIST}))
+        differences = dict(sorted(differences.items()))
 
         new = {}
         known = {}
         for name, (vendored, upstream) in differences.items():
             detail = describe(vendored, upstream)
             entry = known_entries.get(name)
-            if entry and entry.get("fingerprint") == fingerprint(upstream):
+            if is_known(entry, upstream):
                 known[name] = detail
             else:
                 new[name] = (detail, entry is not None)
@@ -275,6 +349,8 @@ def main():
             print(f"NEW    {name}: {detail}{note}")
         for name in stale:
             print(f"stale  {name}: listed as known but no longer differs")
+        for name in left_out:
+            print(f"skip   {DEVICE_LIST}: catalog entry for {name}, not vendored")
 
         if args.update_known:
             known_file["differences"] = {
@@ -312,6 +388,7 @@ def main():
             new,
             known,
             stale,
+            left_out,
             dangling,
             args.known,
         )
