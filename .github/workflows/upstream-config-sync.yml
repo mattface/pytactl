@@ -10,7 +10,8 @@
 # as upstream still matches the fingerprint recorded for them. Everything else
 # that differs is applied file by file (see scripts/sync_upstream_configs.py).
 #
-# Nothing is proposed when the test suite fails against the synced configs.
+# When the test suite fails against the synced configs the pull request is
+# still proposed, as a draft with the failing tests listed, and the run fails.
 #
 # The pull request is opened from a fixed branch, so a later run with further
 # upstream changes updates the open one instead of opening another.
@@ -72,15 +73,32 @@ jobs:
           # The upstream checkout is not part of the change.
           rm -rf upstream
 
-      # A failure fails the job, so no pull request is proposed for configs the
-      # suite rejects; the run itself is the report.
+      # A failure does not stop the pull request: the changes still need a
+      # reviewer to decide what to take. The failure is reported in it instead.
       - name: Run the test suite against the synced configs
+        id: tests
+        continue-on-error: true
         run: |
           if [ -z "$(git status --porcelain -- pytactl/tac_configs scripts/known-config-differences.json)" ]; then
             echo "No changes; skipping."
             exit 0
           fi
-          python -m pytest -q
+          set -o pipefail
+          python -m pytest -q 2>&1 | tee "$RUNNER_TEMP/pytest.log"
+
+      - name: Report test failures in the pull request
+        if: steps.tests.outcome == 'failure'
+        run: |
+          {
+            echo
+            echo "## Warning: the test suite fails against these configs"
+            echo
+            echo "This pull request is opened as a draft until that is resolved."
+            echo
+            echo '```'
+            sed -n '/short test summary info/,$p' "$RUNNER_TEMP/pytest.log"
+            echo '```'
+          } >> "$RUNNER_TEMP/summary.md"
 
       - name: Propose a pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -97,7 +115,15 @@ jobs:
             Apply the upstream qcom-test-automation-controller config changes
             not listed in scripts/known-config-differences.json.
           signoff: true
+          draft: ${{ steps.tests.outcome == 'failure' }}
           body-path: ${{ runner.temp }}/summary.md
           add-paths: |
             pytactl/tac_configs
             scripts/known-config-differences.json
+
+      # Keep the run red when the suite failed, after the pull request is up.
+      - name: Fail when the test suite failed
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::The test suite fails against the synced configs."
+          exit 1
