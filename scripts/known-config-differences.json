@@ -1,6 +1,11 @@
 {
     "description": "Upstream TAC config changes deliberately not taken into pytactl/tac_configs/. Maintained by scripts/sync_upstream_configs.py; see its docstring. An entry suppresses the upstream-config-sync pull request only while upstream still matches its fingerprint.",
     "differences": {
+        "TAC_FTDI_16.pinout.json": {
+            "note": "Upstream d313724 and 665b842 drop the bootToEDL, bootToEUD, bootToUEFIMenu and bootToFastBoot sequences and add USB disconnect to the power sequences. The shortened usb_descriptor is taken.",
+            "fingerprint": "sha256:96abe032a859e181129fe2258b7056d48a90a0fdea2606b146fd504dccbd1c3f",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
         "TAC_FTDI_49.pinout.json": {
             "note": "Upstream 7f524c2 converts the script's CRLF line endings to LF.",
             "fingerprint": "sha256:a9aa06107d7debbc51f00d24c40d6530328b3ff316c2c4aece2abb605ac8de5a",
