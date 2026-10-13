@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is missing or cannot be loaded
   ([#31](https://github.com/qualcomm/pytactl/issues/31)).
 
+### Deprecated
+
+- `pytactl installconfigs` is deprecated and will be removed in a future
+  release ([#32](https://github.com/qualcomm/pytactl/issues/32)). It installs
+  raw upstream configs, without the fixes the bundled set carries, and the
+  installed set then replaces the bundled one for every command not given
+  `--tac-config-path`, across pytactl upgrades. The command now warns when
+  run, and the board commands warn whenever they fall back to an installed
+  set. Use `convertconfigs` with `--tac-config-path` for a config set of your
+  own, and delete the installed directory to go back to the bundled configs.
+
 ### Fixed
 
 - The test suite no longer needs git. The two tests that read a real git

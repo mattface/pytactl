@@ -13,6 +13,7 @@ import os
 import pytest
 
 import pytactl
+from pytactl import cli
 from pytactl.cli import build_parser, main
 
 
@@ -45,3 +46,23 @@ def test_listconfigs_lists_the_bundled_configs(capsys):
     out = capsys.readouterr().out
     assert "bundled with pytactl" in out
     assert pytactl.BUNDLED_DEFAULT_CONFIG_FILENAME in out
+
+
+def test_falling_back_to_installed_configs_warns(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr(cli, "INSTALLED_TAC_CONFIG_PATH", str(tmp_path))
+    monkeypatch.setattr(cli, "default_tac_config_path", lambda: str(tmp_path))
+
+    with pytest.raises(SystemExit):
+        main(["listconfigs"])
+
+    assert "deprecated 'installconfigs'" in caplog.text
+
+
+def test_explicit_config_path_does_not_warn(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr(cli, "INSTALLED_TAC_CONFIG_PATH", str(tmp_path))
+    monkeypatch.setattr(cli, "default_tac_config_path", lambda: str(tmp_path))
+
+    with pytest.raises(SystemExit):
+        main(["listconfigs", "--tac-config-path", str(tmp_path)])
+
+    assert "deprecated 'installconfigs'" not in caplog.text

@@ -56,11 +56,10 @@ def build_parser():
     config_path = ArgumentParser(add_help=False)
     config_path.add_argument(
         "--tac-config-path",
-        default=default_tac_config_path(),
         help="Path to directory with TAC configs (devicelist.json + "
-        ".pinout.json files). Defaults to the configs installed by "
-        "'installconfigs', else those bundled with the package, which cover "
-        "every board upstream ships a config for.",
+        ".pinout.json files). Defaults to the configs bundled with the "
+        "package, which cover every board upstream ships a config for, unless "
+        "the deprecated 'installconfigs' has installed a set.",
     )
 
     subparsers = parser.add_subparsers(dest="mode", required=True, metavar="COMMAND")
@@ -109,8 +108,10 @@ def build_parser():
     installconfigs = subparsers.add_parser(
         "installconfigs",
         parents=[base],
-        help="Download TAC config files from the config repository and convert "
-        "them to the shared pinout format",
+        help="(deprecated) Download TAC config files from the config repository "
+        "and convert them to the shared pinout format. The configs bundled with "
+        "pytactl carry fixes upstream does not; use 'convertconfigs' and "
+        "--tac-config-path for a config set of your own",
     )
     installconfigs.add_argument(
         "--config-repository",
@@ -301,11 +302,29 @@ def _resolve_serial(args, parser, command):
     parser.error(f"{command} requires --serial or --config-file-path ({error})")
 
 
+def _resolve_tac_config_path(args):
+    if getattr(args, "tac_config_path", False) is not None:
+        return
+
+    args.tac_config_path = default_tac_config_path()
+    if args.tac_config_path == INSTALLED_TAC_CONFIG_PATH:
+        logger.warning(
+            "Using the TAC configs installed by the deprecated 'installconfigs' "
+            "in %s instead of the configs bundled with pytactl. The installed "
+            "configs lack the fixes the bundled ones carry and are not updated "
+            "with pytactl; delete %s to use the bundled configs, or pass "
+            "--tac-config-path to choose a config directory explicitly.",
+            INSTALLED_TAC_CONFIG_PATH,
+            INSTALLED_TAC_CONFIG_PATH,
+        )
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
 
     _setup_logging(args.log_level)
+    _resolve_tac_config_path(args)
 
     if args.mode == "list":
         _list_boards()

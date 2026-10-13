@@ -90,35 +90,11 @@ config.
 ## Using a different config set
 
 `--tac-config-path <dir>` points pytactl at another directory of configs; without it, the
-bundled set is used, unless a config set has been installed with `installconfigs` — that one
-takes precedence.
+bundled set is used.
 
-To pull the current upstream configs rather than the vendored snapshot, use the
-`installconfigs` subcommand. It downloads every config file and `devicelist.json` from the
-config repository, converts them, and installs the result into a per-user data directory
-(resolved with [platformdirs](https://pypi.org/project/platformdirs/), e.g.
-`~/.local/share/pytactl` on Linux):
-
-    pytactl installconfigs
-
-Once that directory is populated, the board subcommands use it automatically. Override the
-source and destination with:
-
-    pytactl installconfigs \
-      --config-repository https://github.com/qualcomm/qcom-test-automation-controller/ \
-      --local-path /path/to/install \
-      --ref main \
-      --repository-path configurations
-
-`--ref` selects the git ref (branch, tag, or commit; default `HEAD`) and `--repository-path` the
-directory within the repository to fetch from (default `configurations`).
-
-`installconfigs` also copies the default FTDI Alpaca-Lite config (which has no upstream config
-file) in as `default.pinout.json` and rewrites empty `configPath` entries in `devicelist.json` to
-point at it.
-
-You can also convert a `configurations/` directory you already have — a checkout of
-qcom-test-automation-controller, say — and point pytactl at the result:
+To use configs that are not in the bundled set — a newer checkout of
+qcom-test-automation-controller, configs for boards of your own, or a config edited in QTAC —
+convert their `configurations/` directory and point pytactl at the result:
 
     pytactl convertconfigs /path/to/qcom-test-automation-controller/configurations \
       --output /path/to/install
@@ -128,8 +104,24 @@ Without `--output` the configs are converted in place, beside the originals. `--
 what would be written without writing it, and `--write-overlay` also writes the UI half of each
 config (see below), producing the complete two-file layout rather than only the half pytactl uses.
 
-Note: some configs in qcom-test-automation-controller currently have syntax issues; pick the
-ones that match your board.
+Note: some configs in qcom-test-automation-controller currently have syntax issues, and the
+bundled set carries fixes upstream does not have (see
+`scripts/known-config-differences.json`); pick the ones that match your board.
+
+### `installconfigs` (deprecated)
+
+`pytactl installconfigs` downloads every config file and `devicelist.json` from the config
+repository, converts them, and installs the result into a per-user data directory (resolved with
+[platformdirs](https://pypi.org/project/platformdirs/), e.g. `~/.local/share/pytactl` on Linux).
+It is deprecated and will be removed in a future release:
+
+- the installed configs are raw upstream, without the fixes the bundled set carries;
+- once that directory is populated, every command not given `--tac-config-path` uses it
+  instead of the bundled set, and keeps doing so after pytactl is upgraded.
+
+pytactl logs a warning whenever it falls back to the installed set. Delete the directory to go
+back to the bundled configs, and use `convertconfigs` with `--tac-config-path` for a config set
+of your own. `pytactl listconfigs` shows which directory is in use.
 
 ## Config file format
 
@@ -188,7 +180,7 @@ first:
       --output /path/to/install
 
 If you are upgrading and a board that used to work now reports a `ConfigScriptError`, your
-installed config directory predates this rule: re-run `pytactl installconfigs`, or
+installed config directory predates this rule: delete it to use the bundled configs, or run
 `pytactl convertconfigs <dir>` to normalise it in place.
 
 ### Provenance annotation

@@ -7,13 +7,11 @@ import platformdirs
 
 __version__ = "3.1.0"
 
-# Configs bundled with the package. Only the synthesized FTDI Alpaca-Lite
-# default (TAC_FTDI_13.pinout.json) ships here; the full config set (a
-# .pinout.json per board plus devicelist.json) is fetched and converted with
-# the "installconfigs" subcommand.
+# Configs bundled with the package: a .pinout.json per board plus
+# devicelist.json, synced from upstream with the fixes pytactl needs.
 PACKAGE_TAC_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "tac_configs")
 
-# Where "installconfigs" writes the full config set by default.
+# Where the deprecated "installconfigs" writes the full config set by default.
 INSTALLED_TAC_CONFIG_PATH = platformdirs.user_data_dir("pytactl")
 
 # Default config repository fetched by "installconfigs".
@@ -38,6 +36,10 @@ def default_tac_config_path():
     Prefer the installed config set (populated by "installconfigs") when it
     exists and is non-empty; otherwise fall back to the configs bundled with
     the package.
+
+    "installconfigs" is deprecated: the installed set is raw upstream, without
+    the fixes the bundled set carries, and once written it shadows the bundled
+    set across pytactl upgrades. The CLI warns whenever it falls back to it.
     """
     installed = INSTALLED_TAC_CONFIG_PATH
     if os.path.isdir(installed) and os.listdir(installed):
