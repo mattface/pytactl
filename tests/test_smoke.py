@@ -10,8 +10,10 @@ and config coverage lives in the dedicated test suite.
 
 import os
 
+import pytest
+
 import pytactl
-from pytactl.cli import build_parser
+from pytactl.cli import build_parser, main
 
 
 def test_version_is_defined():
@@ -29,3 +31,17 @@ def test_parser_dispatches_subcommand():
     parser = build_parser()
     args = parser.parse_args(["list"])
     assert args.mode == "list"
+
+
+def test_listconfigs_exits_nonzero_without_a_device_list(tmp_path, capsys):
+    with pytest.raises(SystemExit) as excinfo:
+        main(["listconfigs", "--tac-config-path", str(tmp_path)])
+    assert excinfo.value.code == 1
+    assert "Cannot read devicelist.json" in capsys.readouterr().out
+
+
+def test_listconfigs_lists_the_bundled_configs(capsys):
+    main(["listconfigs", "--tac-config-path", pytactl.PACKAGE_TAC_CONFIG_PATH])
+    out = capsys.readouterr().out
+    assert "bundled with pytactl" in out
+    assert pytactl.BUNDLED_DEFAULT_CONFIG_FILENAME in out

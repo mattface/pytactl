@@ -590,3 +590,55 @@ def convert_directory(
         "failed": failed,
         "device_list": has_device_list,
     }
+
+
+def list_directory(tac_config_path):
+    """Describe the config set in ``tac_config_path`` as pytactl would load it.
+
+    Every ``devicelist.json`` catalog entry is resolved to its config file the
+    way the board classes do it (by bare file name inside the directory) and
+    that file is loaded with `convert_file`. Config scripts are not parsed: a
+    script error surfaces when a board is created from the config, and is not
+    a sign the config set is missing.
+
+    Returns ``{"entries": [...], "unreferenced": [...]}``. Each entry is the
+    catalog entry's ``name``, ``platform_id``, ``usb_descriptor`` and
+    ``configPath``, plus ``status`` (``"ok"``, ``"missing"`` or ``"invalid"``)
+    and, unless the config loaded, ``error``. ``unreferenced`` names the
+    ``*.pinout.json`` files no catalog entry points at.
+
+    Raises `OSError` or `ValueError` if ``devicelist.json`` cannot be read.
+    """
+    with open(os.path.join(tac_config_path, "devicelist.json")) as handle:
+        device_list = json.load(handle)
+
+    entries = []
+    referenced = set()
+    for entry in device_list.get("catalog", []):
+        config_name = os.path.basename(entry.get("configPath") or "")
+        info = {
+            "name": entry.get("name", ""),
+            "platform_id": entry.get("platform_id"),
+            "usb_descriptor": entry.get("usb_descriptor", ""),
+            "configPath": config_name,
+            "status": "ok",
+        }
+        config_path = os.path.join(tac_config_path, config_name)
+        if not config_name or not os.path.isfile(config_path):
+            info["status"] = "missing"
+            info["error"] = "no configPath" if not config_name else "file not found"
+        else:
+            referenced.add(config_name)
+            try:
+                convert_file(config_path)
+            except (OSError, ValueError, ConfigFormatError) as error:
+                info["status"] = "invalid"
+                info["error"] = str(error)
+        entries.append(info)
+
+    unreferenced = sorted(
+        name
+        for name in os.listdir(tac_config_path)
+        if name.endswith(PINOUT_EXTENSION) and name not in referenced
+    )
+    return {"entries": entries, "unreferenced": unreferenced}

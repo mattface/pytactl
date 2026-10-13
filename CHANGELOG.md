@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bughopper V1 and V2 boards have a `wakeUp` quick method that pulses
   VOL_DOWN for 300 ms to wake the target from suspend. The JCTL header carries
   no power key, and VOL_DOWN is a wakeup source on the Arduino UNO Q.
+- A `listconfigs` subcommand lists the TAC configs pytactl finds: the config
+  directory in use, each `devicelist.json` entry with its config file, and
+  config files no entry refers to. It exits non-zero when a referenced config
+  is missing or cannot be loaded
+  ([#31](https://github.com/qualcomm/pytactl/issues/31)).
 
 ### Fixed
 

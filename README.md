@@ -71,6 +71,22 @@ driven:
 
 `pytactl/tac_configs/README.md` records the upstream commit the set was taken from.
 
+## Listing the configs pytactl finds
+
+`listconfigs` shows which config directory pytactl uses (the installed set, the bundled
+one, or the one given with `--tac-config-path`), each debug board `devicelist.json`
+lists with its config file, platform id and USB descriptor, and any config file no
+board entry refers to:
+
+    pytactl listconfigs --log-level INFO
+
+Every config a board entry refers to is loaded, and a missing or unreadable one is
+flagged. The command exits with status 1 when `devicelist.json` cannot be read, lists
+no boards, or refers to a missing or invalid config, so it can serve as a check that
+the configs are installed (for example in a distribution's package tests). Config
+scripts are not parsed; a script error is reported when a board is driven with that
+config.
+
 ## Using a different config set
 
 `--tac-config-path <dir>` points pytactl at another directory of configs; without it, the

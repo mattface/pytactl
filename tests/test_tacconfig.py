@@ -994,3 +994,75 @@ def test_board_creates_ports_from_the_platform_type(tmp_path):
 
     # bus C is declared with bus_function 2, so it becomes a port.
     assert sorted(board.ports) == ["C"]
+
+
+def write_config_set(directory, catalog):
+    """Write a config directory holding ``catalog`` and a valid pinout file."""
+    pinout = tacconfig.convert_configuration(LEGACY_CONFIG)
+    write_json(directory / "TAC_FTDI_999.pinout.json", pinout)
+    write_json(directory / "devicelist.json", {"catalog": catalog})
+
+
+def test_list_directory_resolves_catalog_entries(tmp_path):
+    write_config_set(
+        tmp_path,
+        [
+            {
+                "name": "Test Board",
+                "platform_id": 999,
+                "usb_descriptor": "TEST DEBUG BOARD",
+                "configPath": "../../configurations/TAC_FTDI_999.pinout.json",
+            }
+        ],
+    )
+
+    listing = tacconfig.list_directory(str(tmp_path))
+
+    assert listing == {
+        "entries": [
+            {
+                "name": "Test Board",
+                "platform_id": 999,
+                "usb_descriptor": "TEST DEBUG BOARD",
+                "configPath": "TAC_FTDI_999.pinout.json",
+                "status": "ok",
+            }
+        ],
+        "unreferenced": [],
+    }
+
+
+def test_list_directory_reports_missing_and_invalid_configs(tmp_path):
+    write_config_set(
+        tmp_path,
+        [
+            {"name": "Missing", "configPath": "TAC_FTDI_1.pinout.json"},
+            {"name": "No path", "configPath": ""},
+            {"name": "Invalid", "configPath": "TAC_FTDI_2.pinout.json"},
+        ],
+    )
+    write_json(tmp_path / "TAC_FTDI_2.pinout.json", {"unrelated": True})
+
+    listing = tacconfig.list_directory(str(tmp_path))
+
+    statuses = {entry["name"]: entry["status"] for entry in listing["entries"]}
+    assert statuses == {
+        "Missing": "missing",
+        "No path": "missing",
+        "Invalid": "invalid",
+    }
+    assert all("error" in entry for entry in listing["entries"])
+    assert listing["unreferenced"] == ["TAC_FTDI_999.pinout.json"]
+
+
+def test_list_directory_requires_a_device_list(tmp_path):
+    with pytest.raises(OSError):
+        tacconfig.list_directory(str(tmp_path))
+
+
+@requires_bundled_configs
+def test_bundled_device_list_has_a_loadable_config_for_every_board():
+    listing = tacconfig.list_directory(pytactl.PACKAGE_TAC_CONFIG_PATH)
+
+    assert listing["entries"]
+    assert [entry for entry in listing["entries"] if entry["status"] != "ok"] == []

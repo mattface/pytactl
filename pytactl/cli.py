@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import os
 import sys
 from argparse import ArgumentParser
 
@@ -11,6 +12,8 @@ from . import (
     BUNDLED_DEFAULT_CONFIG_FILENAME,
     DEFAULT_CONFIG_FILENAME,
     DEFAULT_CONFIG_REPOSITORY,
+    INSTALLED_TAC_CONFIG_PATH,
+    PACKAGE_TAC_CONFIG_PATH,
     __version__,
     default_tac_config_path,
 )
@@ -49,7 +52,9 @@ def build_parser():
         nargs="+",
         help="Debug board serial number(s)",
     )
-    common.add_argument(
+    # Where to load the TAC configs from.
+    config_path = ArgumentParser(add_help=False)
+    config_path.add_argument(
         "--tac-config-path",
         default=default_tac_config_path(),
         help="Path to directory with TAC configs (devicelist.json + "
@@ -67,7 +72,7 @@ def build_parser():
     )
 
     shell = subparsers.add_parser(
-        "shell", parents=[base, common], help="Run the interactive shell"
+        "shell", parents=[base, common, config_path], help="Run the interactive shell"
     )
     shell.add_argument(
         "--config-file-path",
@@ -77,7 +82,9 @@ def build_parser():
     )
 
     oneshot = subparsers.add_parser(
-        "oneshot", parents=[base, common], help="Run a single command and exit"
+        "oneshot",
+        parents=[base, common, config_path],
+        help="Run a single command and exit",
     )
     oneshot.add_argument("command", help="Command to run, e.g. bootToEDL")
     oneshot.add_argument(
@@ -90,6 +97,13 @@ def build_parser():
         help="Path to a single config file (.pinout.json, or a .tcnf in either "
         "the split or the legacy combined format); use for debugging the config "
         "file syntax.",
+    )
+
+    subparsers.add_parser(
+        "listconfigs",
+        parents=[base, config_path],
+        help="List the TAC configs found in the config directory and check "
+        "that every devicelist.json entry has a loadable config",
     )
 
     installconfigs = subparsers.add_parser(
@@ -172,7 +186,7 @@ def build_parser():
     )
 
     service = subparsers.add_parser(
-        "service", parents=[base, common], help="Run the REST API service"
+        "service", parents=[base, common, config_path], help="Run the REST API service"
     )
     service.add_argument(
         "--hostname",
@@ -201,6 +215,56 @@ def _list_boards():
         serial = board["serial"] or "<no serial reported>"
         vid_pid = f"{board['vid']:04x}:{board['pid']:04x}"
         print(f"  {board['type']:<14} vid:pid={vid_pid}  serial={serial}")
+
+
+def _list_configs(tac_config_path):
+    from .tacconfig import list_directory
+
+    if os.path.realpath(tac_config_path) == os.path.realpath(PACKAGE_TAC_CONFIG_PATH):
+        origin = "bundled with pytactl"
+    elif os.path.realpath(tac_config_path) == os.path.realpath(
+        INSTALLED_TAC_CONFIG_PATH
+    ):
+        origin = "installed by installconfigs"
+    else:
+        origin = "set with --tac-config-path"
+    print(f"TAC config directory: {tac_config_path} ({origin})")
+
+    try:
+        listing = list_directory(tac_config_path)
+    except (OSError, ValueError) as error:
+        print(f"Cannot read devicelist.json: {error}")
+        return False
+
+    entries = listing["entries"]
+    if not entries:
+        print("devicelist.json lists no debug boards.")
+        return False
+
+    name_width = max(len(entry["name"]) for entry in entries)
+    config_width = max(len(entry["configPath"]) for entry in entries)
+    print(f"Configs for {len(entries)} debug boards:")
+    for entry in entries:
+        line = (
+            f"  {entry['name']:<{name_width}}  {entry['configPath']:<{config_width}}"
+            f"  platform_id={entry['platform_id']}"
+        )
+        if entry["usb_descriptor"]:
+            line += f"  usb_descriptor={entry['usb_descriptor']!r}"
+        if entry["status"] != "ok":
+            line += f"  {entry['status'].upper()}: {entry['error']}"
+        print(line)
+
+    if listing["unreferenced"]:
+        print("Config files not referenced by devicelist.json:")
+        for name in listing["unreferenced"]:
+            print(f"  {name}")
+
+    broken = [entry for entry in entries if entry["status"] != "ok"]
+    if broken:
+        print(f"{len(broken)} debug board(s) have a missing or invalid config")
+        return False
+    return True
 
 
 def _single_board_serial(boards):
@@ -245,6 +309,9 @@ def main(argv=None):
 
     if args.mode == "list":
         _list_boards()
+    elif args.mode == "listconfigs":
+        if not _list_configs(args.tac_config_path):
+            sys.exit(1)
     elif args.mode == "installconfigs":
         from .installconfigs import install_configs
 
