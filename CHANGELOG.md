@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   VOL_DOWN for 300 ms to wake the target from suspend. The JCTL header carries
   no power key, and VOL_DOWN is a wakeup source on the Arduino UNO Q.
 
+### Fixed
+
+- The test suite no longer needs git. The two tests that read a real git
+  checkout skip when git is not installed, and the provenance tests that only
+  need a checkout's description stub it instead, so they run everywhere
+  ([#33](https://github.com/qualcomm/pytactl/issues/33)).
+
 ## [3.1] - 2026-10-05
 
 ### Added

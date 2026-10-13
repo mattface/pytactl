@@ -18,7 +18,7 @@ import os
 import subprocess
 
 import pytest
-from conftest import requires_bundled_configs
+from conftest import requires_bundled_configs, requires_git
 
 import pytactl
 from pytactl import debugboard, tacconfig
@@ -696,6 +696,7 @@ def test_annotate_source_without_a_filename():
     assert annotated[tacconfig.SOURCE_FIELD] == {"commit": "abc123"}
 
 
+@requires_git
 def test_git_source_info_reads_the_checkout(tmp_path):
     checkout, commit = git_checkout(tmp_path)
     configurations = checkout / "configurations"
@@ -710,6 +711,7 @@ def test_git_source_info_reads_the_checkout(tmp_path):
     }
 
 
+@requires_git
 def test_git_source_info_omits_the_path_at_the_top_of_the_checkout(tmp_path):
     checkout, commit = git_checkout(tmp_path)
 
@@ -727,21 +729,62 @@ def test_git_source_info_returns_none_outside_a_checkout(tmp_path):
     assert tacconfig.git_source_info(str(plain)) is None
 
 
-def test_convert_directory_annotates_from_the_source_checkout(tmp_path):
-    checkout, commit = git_checkout(tmp_path / "qtac")
-    configurations = checkout / "configurations"
-    configurations.mkdir()
-    write_json(configurations / "TAC_FTDI_999.tcnf", LEGACY_CONFIG)
+def test_git_source_info_returns_none_without_git(tmp_path, monkeypatch):
+    """git is optional: with no git to run, provenance is simply unknown."""
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    no_git = tmp_path / "empty-bin"
+    no_git.mkdir()
+    monkeypatch.setenv("PATH", str(no_git))
+
+    assert tacconfig.git_source_info(str(checkout)) is None
+
+
+def test_convert_directory_converts_unannotated_without_git(
+    legacy_dir, tmp_path, monkeypatch
+):
+    no_git = tmp_path / "empty-bin"
+    no_git.mkdir()
+    monkeypatch.setenv("PATH", str(no_git))
     destination = tmp_path / "installed"
 
-    tacconfig.convert_directory(str(configurations), str(destination))
+    result = tacconfig.convert_directory(str(legacy_dir), str(destination))
 
-    source = json.loads((destination / "TAC_FTDI_999.pinout.json").read_text())[
+    assert result["converted"] == ["TAC_FTDI_999.pinout.json"]
+    pinout = json.loads((destination / "TAC_FTDI_999.pinout.json").read_text())
+    assert tacconfig.SOURCE_FIELD not in pinout
+
+
+def stub_git_source_info(monkeypatch, source):
+    """Make every directory look like a checkout described by ``source``, and
+    return the list of directories it was asked about."""
+    asked = []
+
+    def git_source_info(directory):
+        asked.append(directory)
+        return dict(source)
+
+    monkeypatch.setattr(tacconfig, "git_source_info", git_source_info)
+    return asked
+
+
+def test_convert_directory_annotates_from_the_source_checkout(
+    legacy_dir, tmp_path, monkeypatch
+):
+    observed = {
+        "repository": "https://example.invalid/qtac.git",
+        "commit": "1" * 40,
+        "path": "configurations",
+    }
+    asked = stub_git_source_info(monkeypatch, observed)
+    destination = tmp_path / "installed"
+
+    tacconfig.convert_directory(str(legacy_dir), str(destination))
+
+    assert asked == [str(legacy_dir)]
+    assert json.loads((destination / "TAC_FTDI_999.pinout.json").read_text())[
         tacconfig.SOURCE_FIELD
-    ]
-    assert source["commit"] == commit
-    assert source["path"] == "configurations"
-    assert source["file"] == "TAC_FTDI_999.tcnf"
+    ] == {**observed, "file": "TAC_FTDI_999.tcnf"}
 
 
 def test_convert_directory_uses_the_source_info_it_is_given(legacy_dir, tmp_path):
@@ -772,7 +815,7 @@ def test_convert_directory_can_skip_annotating(legacy_dir, tmp_path):
     assert tacconfig.SOURCE_FIELD not in pinout
 
 
-def test_convert_directory_does_not_restamp_an_imported_set(tmp_path):
+def test_convert_directory_does_not_restamp_an_imported_set(tmp_path, monkeypatch):
     """Re-converting an already-imported set from inside another checkout must
     keep the provenance it has: the observed repository is not where those
     configs came from."""
@@ -784,7 +827,11 @@ def test_convert_directory_does_not_restamp_an_imported_set(tmp_path):
         "TAC_FTDI_999.tcnf",
     )
     write_json(imported / "TAC_FTDI_999.pinout.json", original)
-    git_checkout(tmp_path)  # the *wrong* repository, observed around it
+    # The *wrong* repository, observed around the imported set.
+    stub_git_source_info(
+        monkeypatch,
+        {"repository": "https://example.invalid/pytactl.git", "commit": "1" * 40},
+    )
 
     tacconfig.convert_directory(str(imported))
 
