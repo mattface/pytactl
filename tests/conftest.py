@@ -8,8 +8,9 @@ every ``*.pinout.json`` config of the installed config set can be loaded through
 the exact same code path that ``pytactl.shell`` and ``pytactl.service`` use:
 ``Board.create_board()``.
 
-The config set is the one ``pytactl installconfigs`` produces: every upstream
-config converted to the shared pinout format (see :mod:`pytactl.tacconfig`).
+The config set is the one bundled with pytactl in ``pytactl/tac_configs/``, or
+the one ``$PYTACTL_TAC_CONFIG_DIR`` names: upstream configs converted to the
+shared pinout format (see :mod:`pytactl.tacconfig`).
 
 A handful of configs are deliberately handled specially (see the maps below):
 
@@ -45,15 +46,16 @@ PINOUT_GLOB = "*" + tacconfig.PINOUT_EXTENSION
 def resolve_config_dir():
     """Locate the directory holding the full TAC config set, or ``None``.
 
-    Candidates, in order - the same precedence ``pytactl`` itself applies, plus
-    the environment override on top:
+    Candidates, in order:
 
     1. ``$PYTACTL_TAC_CONFIG_DIR`` - explicit override, for distro packagers and
-       anyone who unpacks a config set somewhere of their own choosing.
-    2. ``pytactl.INSTALLED_TAC_CONFIG_PATH`` - a newer upstream set pulled with
-       "pytactl installconfigs", so the suite tests against that when it exists.
-    3. ``pytactl.PACKAGE_TAC_CONFIG_PATH`` - the config set vendored in this
+       anyone who converts a config set somewhere of their own choosing.
+    2. ``pytactl.PACKAGE_TAC_CONFIG_PATH`` - the config set vendored in this
        repository, which is what a plain checkout tests against.
+
+    The directory written by the deprecated "pytactl installconfigs" is not a
+    candidate: it would silently replace the vendored set under test on any
+    machine that ever ran the command.
 
     Returns ``None`` when none of them holds a ``.pinout.json`` file - e.g. a
     distro build that strips the bundled configs - so that the config-driven
@@ -61,7 +63,6 @@ def resolve_config_dir():
     """
     for candidate in (
         os.environ.get("PYTACTL_TAC_CONFIG_DIR"),
-        pytactl.INSTALLED_TAC_CONFIG_PATH,
         pytactl.PACKAGE_TAC_CONFIG_PATH,
     ):
         if candidate and glob.glob(os.path.join(candidate, PINOUT_GLOB)):
@@ -74,8 +75,8 @@ CONFIG_DIR = resolve_config_dir()
 
 NO_CONFIGS_REASON = (
     "TAC config set not available: the configs bundled in pytactl/tac_configs "
-    "are missing, and neither PYTACTL_TAC_CONFIG_DIR nor the directory written "
-    "by 'pytactl installconfigs' holds any .pinout.json file"
+    "are missing, and PYTACTL_TAC_CONFIG_DIR does not name a directory holding "
+    "any .pinout.json file"
 )
 
 # Skip marker for tests that cannot run without a config set.
