@@ -18,8 +18,7 @@ The data-driven tests run over the `.pinout.json` files of a TAC config set.
 1. `$PYTACTL_TAC_CONFIG_DIR`, if set — an explicit override, for distro packagers
    and anyone who unpacks a config set somewhere of their own choosing.
 2. `pytactl.INSTALLED_TAC_CONFIG_PATH` — a newer upstream set pulled with
-   `pytactl installconfigs`, so the suite tests against that when it exists (the
-   `config-loading` CI workflow does exactly this).
+   `pytactl installconfigs`, so the suite tests against that when it exists.
 3. `pytactl.PACKAGE_TAC_CONFIG_PATH` — the config set vendored in this repository
    under `pytactl/tac_configs/`, which is what a plain checkout tests against.
 
