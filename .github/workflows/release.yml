@@ -1,0 +1,58 @@
+# Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Creates a GitHub release when a vX.Y tag is pushed, then starts the PyPI
+# publishing workflow for that tag.
+#
+# A release created with the default GITHUB_TOKEN does not trigger other
+# workflows, so the "release: published" trigger in publish.yml never fires for
+# it. publish.yml is therefore started explicitly through workflow_dispatch,
+# which GITHUB_TOKEN is allowed to trigger.
+#
+# If a release for the tag already exists (for example one created by hand in
+# the web UI), nothing is done: publishing that release already triggered
+# publish.yml.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check the tag format
+        id: check
+        run: |
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Tag $TAG is not in the vX.Y form; no release created."
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the release
+        id: create
+        if: steps.check.outputs.valid == 'true'
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start publishing to PyPI
+        if: steps.create.outputs.created == 'true'
+        run: gh workflow run publish.yml --ref "$TAG"
