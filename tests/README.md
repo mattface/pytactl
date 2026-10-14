@@ -12,34 +12,26 @@ the tests import it as `from pytactl import debugboard`.
 ## Configs under test
 
 The data-driven tests run over the `.pinout.json` files of a TAC config set.
-`tests/conftest.py` looks for one in three places, in order — the same precedence
-`pytactl` itself applies, plus an environment override on top:
+`tests/conftest.py` looks for one in two places, in order:
 
 1. `$PYTACTL_TAC_CONFIG_DIR`, if set — an explicit override, for distro packagers
-   and anyone who unpacks a config set somewhere of their own choosing.
-2. `pytactl.INSTALLED_TAC_CONFIG_PATH` — a newer upstream set pulled with
-   `pytactl installconfigs`, so the suite tests against that when it exists (the
-   `config-loading` CI workflow does exactly this).
-3. `pytactl.PACKAGE_TAC_CONFIG_PATH` — the config set vendored in this repository
+   and anyone who converts a config set somewhere of their own choosing.
+2. `pytactl.PACKAGE_TAC_CONFIG_PATH` — the config set vendored in this repository
    under `pytactl/tac_configs/`, which is what a plain checkout tests against.
+
+The directory written by the deprecated `pytactl installconfigs` is not consulted, so
+a set installed on the machine never replaces the vendored one under test.
 
 So a bare `python -m pytest` in a fresh checkout runs the full suite offline, against
 the bundled configs. To test against current upstream instead:
-
-```sh
-pytactl installconfigs
-```
-
-or
 
 ```sh
 pytactl convertconfigs /path/to/upstream/configurations --output ~/tac-configs
 export PYTACTL_TAC_CONFIG_DIR=~/tac-configs
 ```
 
-If none of the three holds a `.pinout.json` file — a distro build that strips the
-bundled configs, say — every config-dependent test **skips** with a reason naming all
-three, and the remainder of the suite (imports, CLI parser, config conversion,
+If neither holds a `.pinout.json` file — a distro build that strips the bundled
+configs, say — every config-dependent test **skips** with a reason naming both, and the remainder of the suite (imports, CLI parser, config conversion,
 `create_board()` dispatch for Bughopper, …) still runs — see
 [issue #22](https://github.com/qualcomm/pytactl/issues/22). The handful of tests that
 are specifically *about* the vendored set skip on their own marker,

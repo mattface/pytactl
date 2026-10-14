@@ -12,6 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bughopper V1 and V2 boards have a `wakeUp` quick method that pulses
   VOL_DOWN for 300 ms to wake the target from suspend. The JCTL header carries
   no power key, and VOL_DOWN is a wakeup source on the Arduino UNO Q.
+- A `listconfigs` subcommand lists the TAC configs pytactl finds: the config
+  directory in use, each `devicelist.json` entry with its config file, and
+  config files no entry refers to. It exits non-zero when a referenced config
+  is missing or cannot be loaded
+  ([#31](https://github.com/qualcomm/pytactl/issues/31)).
+
+### Deprecated
+
+- `pytactl installconfigs` is deprecated and will be removed in a future
+  release ([#32](https://github.com/qualcomm/pytactl/issues/32)). It installs
+  raw upstream configs, without the fixes the bundled set carries, and the
+  installed set then replaces the bundled one for every command not given
+  `--tac-config-path`, across pytactl upgrades. The command now warns when
+  run, and the board commands warn whenever they fall back to an installed
+  set. Use `convertconfigs` with `--tac-config-path` for a config set of your
+  own, and delete the installed directory to go back to the bundled configs.
 
 ### Fixed
 

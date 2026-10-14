@@ -110,7 +110,17 @@ def install_configs(
 
     Each installed config is annotated with the repository, ref and commit it
     came from, unless ``annotate`` is false.
+
+    Deprecated: the configs bundled with pytactl are synced from upstream with
+    the fixes pytactl needs, which a raw upstream install lacks.
     """
+    logger.warning(
+        "'installconfigs' is deprecated and will be removed in a future release. "
+        "The configs bundled with pytactl are synced from upstream and carry "
+        "fixes upstream does not; the configs installed here replace them for "
+        "every command that is not given --tac-config-path. To use a config set "
+        "of your own, convert it with 'convertconfigs' and pass --tac-config-path."
+    )
     config_repository = config_repository or DEFAULT_CONFIG_REPOSITORY
     local_path = local_path or INSTALLED_TAC_CONFIG_PATH
     ref = ref or DEFAULT_REF
