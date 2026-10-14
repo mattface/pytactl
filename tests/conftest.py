@@ -94,6 +94,14 @@ requires_bundled_configs = pytest.mark.skipif(
     reason="the config set bundled in pytactl/tac_configs is not present",
 )
 
+# Tests that build a real git checkout to exercise pytactl's git calls. git is
+# optional at runtime - without it, configs are converted unannotated - so a
+# build environment without git skips these rather than failing.
+requires_git = pytest.mark.skipif(
+    shutil.which("git") is None,
+    reason="git is not installed; the test builds a git checkout",
+)
+
 
 def config_path_or_skip(name):
     """Return the path to config ``name``, skipping the test if it is absent."""

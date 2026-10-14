@@ -45,6 +45,10 @@ three, and the remainder of the suite (imports, CLI parser, config conversion,
 are specifically *about* the vendored set skip on their own marker,
 `requires_bundled_configs`, so de-vendoring is not a build failure.
 
+git is not needed either. The two tests that check how pytactl reads a git checkout
+(`git_source_info`) build a real one and skip on the `requires_git` marker when git
+is not installed; everything else about provenance annotation runs without it.
+
 ## Running
 
 ```sh
