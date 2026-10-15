@@ -53,12 +53,15 @@ with this directory file by file, ignoring the `source` annotation, and opens a
 pull request (from the `upstream-config-sync` branch) applying whatever changed.
 Each file it updates is stamped with the upstream commit it now comes from, so
 the configs here need not all name the same commit.
+If the test suite fails against the synced configs, the pull request is opened
+as a draft with the failing tests listed, and the run is marked failed.
 
 Upstream changes that should stay out of pytactl are listed in
 `scripts/known-config-differences.json`, each with a fingerprint of the upstream
 file it was reviewed against. A listed difference does not trigger a pull
-request until upstream changes that file again. The same comparison runs
-locally:
+request until upstream changes that file again. Entries in the upstream
+`devicelist.json` for configs not vendored here, held back ones included, are
+left out of the catalog. The same comparison runs locally:
 
 ```sh
 git clone https://github.com/qualcomm/qcom-test-automation-controller.git /tmp/qtac

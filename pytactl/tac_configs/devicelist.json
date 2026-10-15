@@ -153,8 +153,8 @@
             "description": "CSM - X100",
             "name": "CSM X100",
             "platform_id": 16,
-            "revision": 0,
-            "usb_descriptor": "ALPACA-LITE CSM X100 DEBUG BOARD"
+            "revision": 19,
+            "usb_descriptor": "ALPACA-LITE CSM X100 DEBUG"
         },
         {
             "configPath": "TAC_PSOC_17.pinout.json",

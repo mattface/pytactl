@@ -1,14 +1,24 @@
 {
     "description": "Upstream TAC config changes deliberately not taken into pytactl/tac_configs/. Maintained by scripts/sync_upstream_configs.py; see its docstring. An entry suppresses the upstream-config-sync pull request only while upstream still matches its fingerprint.",
     "differences": {
+        "TAC_FT232H_81.pinout.json": {
+            "note": "Upstream 73eddab renames the Arduino Ventuno Q config from TAC_FT232H_81 to TAC_FT232H_92 and changes its platform_id to 92. pytactl does not use a config for BugHopper boards.",
+            "fingerprint": "removed",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
+        "TAC_FT232H_92.pinout.json": {
+            "note": "Upstream 73eddab renames the Arduino Ventuno Q config from TAC_FT232H_81 to TAC_FT232H_92 and changes its platform_id to 92. pytactl does not use a config for BugHopper boards.",
+            "fingerprint": "sha256:85e63a4e565ab99c0f36e43a8f49e59418c6a58daf6cf2e91c2dbfee16d04479",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
+        "TAC_FTDI_16.pinout.json": {
+            "note": "Upstream d313724 and 665b842 drop the bootToEDL, bootToEUD, bootToUEFIMenu and bootToFastBoot sequences and add USB disconnect to the power sequences. The shortened usb_descriptor is taken.",
+            "fingerprint": "sha256:96abe032a859e181129fe2258b7056d48a90a0fdea2606b146fd504dccbd1c3f",
+            "upstream_commit": "954c804e694e8b7d7e8fc71c105d66c3f4742d20"
+        },
         "TAC_FTDI_49.pinout.json": {
             "note": "Upstream 7f524c2 converts the script's CRLF line endings to LF.",
             "fingerprint": "sha256:a9aa06107d7debbc51f00d24c40d6530328b3ff316c2c4aece2abb605ac8de5a",
-            "upstream_commit": "03cddde77c5c72ef2b0753683e8ad4f8fc5ce6f8"
-        },
-        "TAC_PIC32CXAuto_85.pinout.json": {
-            "note": "IQ10 RRD V1, added upstream (e5e5a38, 182023a).",
-            "fingerprint": "sha256:38d44f49494a360be0e05c2e7ab8734ab2c13605fec4ddaca5578a13c84e611d",
             "upstream_commit": "03cddde77c5c72ef2b0753683e8ad4f8fc5ce6f8"
         },
         "TAC_PSOC_35.pinout.json": {
@@ -19,11 +29,6 @@
         "TAC_PSOC_82.pinout.json": {
             "note": "Upstream 98aa34e adds firmware version 19 to supportedFirmwareVer.",
             "fingerprint": "sha256:feb877c76490f7088133f9cd04f02e46f24271fea728fd44fb502a4b0bc4ea5f",
-            "upstream_commit": "03cddde77c5c72ef2b0753683e8ad4f8fc5ce6f8"
-        },
-        "TAC_PSOC_87.pinout.json": {
-            "note": "HAWI QRD, added upstream (e5e5a38, ed5b882).",
-            "fingerprint": "sha256:414519ad1b38c1638c9b07b07ba3449443876e29516fe6289a68c73a18827d99",
             "upstream_commit": "03cddde77c5c72ef2b0753683e8ad4f8fc5ce6f8"
         },
         "devicelist.json": {

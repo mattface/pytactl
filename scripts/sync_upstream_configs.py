@@ -24,6 +24,15 @@ on to decide whether to open a pull request.
 With --update-known, every current difference is recorded as known instead:
 the way to accept a difference as one to keep out of pytactl.
 
+The upstream device catalog (devicelist.json) is compared without the entries
+whose config the vendored set will not have once the sync is done - configs
+held back as known differences, for one - so that taking a catalog change never
+leaves entries pointing at configs pytactl does not ship.
+
+An upstream config that cannot be converted is taken as removed, but reported
+as a conversion failure, with the converter's error, in the output and in the
+pull request summary.
+
 The provenance annotation ("source") is excluded from the comparison: it names
 the upstream commit, which moves with every upstream push, config change or not.
 """
@@ -55,6 +64,11 @@ LOCAL_ONLY = {BUNDLED_DEFAULT_CONFIG_FILENAME}
 # Fingerprint of a file upstream no longer has.
 REMOVED = "removed"
 
+# Fingerprint of a file upstream has but that could not be converted. It is
+# taken as a removal, but kept apart from one, so that a known difference
+# recorded for it resurfaces once upstream fixes or really removes the file.
+CONVERSION_FAILED = "conversion-failed"
+
 
 def load_json(path):
     with open(path) as handle:
@@ -72,8 +86,13 @@ def comparable(config):
     return {k: v for k, v in config.items() if k != tacconfig.SOURCE_FIELD}
 
 
-def fingerprint(config):
-    """Stable hash of a converted upstream config, provenance excluded."""
+def fingerprint(config, error=None):
+    """Stable hash of a converted upstream config, provenance excluded.
+
+    ``error`` is set when upstream has the file but it could not be converted.
+    """
+    if error:
+        return CONVERSION_FAILED
     if config is None:
         return REMOVED
     canonical = json.dumps(comparable(config), sort_keys=True, separators=(",", ":"))
@@ -98,6 +117,8 @@ def upstream_commit(checkout):
 
 
 def convert_upstream(checkout, destination, commit, repository):
+    """Convert the upstream configs into ``destination``, and return
+    ``{pinout name: error}`` for those that could not be converted."""
     source = os.path.join(checkout, UPSTREAM_CONFIG_PATH)
     result = tacconfig.convert_directory(
         source,
@@ -109,18 +130,23 @@ def convert_upstream(checkout, destination, commit, repository):
             "path": UPSTREAM_CONFIG_PATH,
         },
     )
+    failed = {}
     for name, error in result["failed"]:
         print(f"warning: {name} could not be converted: {error}", file=sys.stderr)
-    return result
+        failed[tacconfig.pinout_filename_for(name)] = error
+    return failed
 
 
-def compare(configs, converted):
+def compare(configs, converted, names=None):
     """Return ``{name: (vendored, upstream)}`` for every file that differs.
 
-    Either side is ``None`` when the file exists only on the other.
+    Either side is ``None`` when the file exists only on the other. ``names``
+    limits the comparison to those files.
     """
+    if names is None:
+        names = (config_names(configs) | config_names(converted)) - LOCAL_ONLY
     differences = {}
-    for name in sorted((config_names(configs) | config_names(converted)) - LOCAL_ONLY):
+    for name in sorted(names):
         vendored_path = os.path.join(configs, name)
         upstream_path = os.path.join(converted, name)
         vendored = load_json(vendored_path) if os.path.exists(vendored_path) else None
@@ -134,9 +160,47 @@ def compare(configs, converted):
     return differences
 
 
-def describe(vendored, upstream):
+def is_known(entry, upstream, error=None):
+    """Whether a known-differences ``entry`` still matches ``upstream``."""
+    return bool(entry) and entry.get("fingerprint") == fingerprint(upstream, error)
+
+
+def configs_after_sync(configs, converted, applied):
+    """Names of the configs the vendored set has once ``applied`` are taken."""
+    names = {
+        name
+        for name in os.listdir(configs)
+        if name.endswith(tacconfig.PINOUT_EXTENSION)
+    }
+    for name in applied:
+        if os.path.exists(os.path.join(converted, name)):
+            names.add(name)
+        else:
+            names.discard(name)
+    return names
+
+
+def drop_unvendored_catalog_entries(converted, available):
+    """Remove the catalog entries of the converted devicelist.json whose config
+    is not in ``available``, and return those configs' names."""
+    path = os.path.join(converted, DEVICE_LIST)
+    if not os.path.exists(path):
+        return []
+    device_list = load_json(path)
+    catalog = device_list.get("catalog", [])
+    kept = [entry for entry in catalog if entry.get("configPath") in available]
+    if len(kept) == len(catalog):
+        return []
+    device_list["catalog"] = kept
+    write_json(path, device_list)
+    return sorted({entry.get("configPath") for entry in catalog if entry not in kept})
+
+
+def describe(vendored, upstream, error=None):
     if vendored is None:
         return "new upstream file"
+    if error:
+        return f"could not be converted upstream ({error})"
     if upstream is None:
         return "removed upstream"
     fields = sorted(
@@ -161,13 +225,37 @@ def dangling_catalog_entries(configs):
     )
 
 
-def write_summary(path, commit, repository, new, known, stale, dangling, known_path):
+def write_summary(
+    path,
+    commit,
+    repository,
+    new,
+    known,
+    stale,
+    left_out,
+    dangling,
+    failed,
+    known_path,
+):
     web = repository.removesuffix(".git")
     lines = [
         "Sync of the vendored TAC configs in `pytactl/tac_configs/` with "
         f"[qcom-test-automation-controller]({web}) at "
         f"[`{commit[:12]}`]({web}/commit/{commit}).",
         "",
+    ]
+    if failed:
+        lines += [
+            "## Warning: upstream configs that could not be converted",
+            "",
+            "A vendored copy of any of these is taken as removed; check that "
+            "it should not be kept instead:",
+            "",
+        ]
+        lines += [f"- `{name}`: {error}" for name, error in failed.items()]
+        lines.append("")
+
+    lines += [
         "## New upstream differences (applied)",
         "",
     ]
@@ -195,6 +283,17 @@ def write_summary(path, commit, repository, new, known, stale, dangling, known_p
         ]
         lines += [f"- `{name}`" for name in stale]
 
+    if left_out:
+        lines += [
+            "",
+            "## Catalog entries left out",
+            "",
+            "Upstream `devicelist.json` lists these configs, which are not "
+            "vendored, so their entries are not taken:",
+            "",
+        ]
+        lines += [f"- `{name}`" for name in left_out]
+
     if dangling:
         lines += [
             "",
@@ -204,9 +303,7 @@ def write_summary(path, commit, repository, new, known, stale, dangling, known_p
         lines += [f"- `{name}`" for name in dangling]
         lines += [
             "",
-            "The catalog was updated but these configs are held back as known "
-            "differences; the bundled-config tests will fail until that is "
-            "resolved.",
+            "The bundled-config tests will fail until that is resolved.",
         ]
 
     relative_known = os.path.relpath(known_path, REPO_ROOT)
@@ -253,15 +350,34 @@ def main():
     known_entries = known_file.setdefault("differences", {})
 
     with tempfile.TemporaryDirectory(prefix="pytactl-upstream-") as converted:
-        convert_upstream(args.checkout, converted, commit, args.repository)
+        failed = convert_upstream(args.checkout, converted, commit, args.repository)
         differences = compare(args.configs, converted)
+        differences.pop(DEVICE_LIST, None)
+
+        # The catalog is compared as it would be taken: without the entries
+        # for configs the vendored set will not have. With --update-known no
+        # config is taken.
+        applied = (
+            []
+            if args.update_known
+            else [
+                name
+                for name, (_, upstream) in differences.items()
+                if not is_known(known_entries.get(name), upstream, failed.get(name))
+            ]
+        )
+        left_out = drop_unvendored_catalog_entries(
+            converted, configs_after_sync(args.configs, converted, applied)
+        )
+        differences.update(compare(args.configs, converted, {DEVICE_LIST}))
+        differences = dict(sorted(differences.items()))
 
         new = {}
         known = {}
         for name, (vendored, upstream) in differences.items():
-            detail = describe(vendored, upstream)
+            detail = describe(vendored, upstream, failed.get(name))
             entry = known_entries.get(name)
-            if entry and entry.get("fingerprint") == fingerprint(upstream):
+            if is_known(entry, upstream, failed.get(name)):
                 known[name] = detail
             else:
                 new[name] = (detail, entry is not None)
@@ -275,12 +391,14 @@ def main():
             print(f"NEW    {name}: {detail}{note}")
         for name in stale:
             print(f"stale  {name}: listed as known but no longer differs")
+        for name in left_out:
+            print(f"skip   {DEVICE_LIST}: catalog entry for {name}, not vendored")
 
         if args.update_known:
             known_file["differences"] = {
                 name: {
                     **known_entries.get(name, {}),
-                    "fingerprint": fingerprint(upstream),
+                    "fingerprint": fingerprint(upstream, failed.get(name)),
                     "upstream_commit": commit,
                 }
                 for name, (_, upstream) in differences.items()
@@ -312,7 +430,9 @@ def main():
             new,
             known,
             stale,
+            left_out,
             dangling,
+            failed,
             args.known,
         )
 
