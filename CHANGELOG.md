@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set. Use `convertconfigs` with `--tac-config-path` for a config set of your
   own, and delete the installed directory to go back to the bundled configs.
 
+### Changed
+
+- The `60-pytactl.rules` udev rule for PSoC Alpaca boards (`05c6:9302`) uses
+  mode `0660` instead of `0666`, like the other rules: access is granted to
+  the `plugdev` group and, through `uaccess`, to the local session user,
+  rather than to every user on the system.
+
 ### Fixed
 
 - `60-pytactl.rules` grants access to FTDI-based debug boards (`0403:6011`):
