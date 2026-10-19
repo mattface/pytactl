@@ -9,6 +9,8 @@
 # changes deliberately not taken; they do not trigger a pull request for as long
 # as upstream still matches the fingerprint recorded for them. Everything else
 # that differs is applied file by file (see scripts/sync_upstream_configs.py).
+# Upstream changes for BugHopper V1 and V2 boards, configs and catalog entries
+# alike, are never taken.
 #
 # When the test suite fails against the synced configs the pull request is
 # still proposed, as a draft with the failing tests listed, and the run fails.
