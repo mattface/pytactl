@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2] - 2026-10-19
+
 ### Added
 
 - Bughopper V1 and V2 boards have a `wakeUp` quick method that pulses
@@ -261,7 +263,8 @@ so it carries a number of breaking changes for anyone upgrading from 1.4.
 Earlier releases are recorded in the git history and in the
 [GitHub releases](https://github.com/qualcomm/pytactl/releases) page.
 
-[Unreleased]: https://github.com/qualcomm/pytactl/compare/v3.1...HEAD
+[Unreleased]: https://github.com/qualcomm/pytactl/compare/v3.2...HEAD
+[3.2]: https://github.com/qualcomm/pytactl/compare/v3.1...v3.2
 [3.1]: https://github.com/qualcomm/pytactl/compare/v3.0...v3.1
 [3.0]: https://github.com/qualcomm/pytactl/compare/v2.0...v3.0
 [2.0]: https://github.com/qualcomm/pytactl/compare/v1.4...v2.0
