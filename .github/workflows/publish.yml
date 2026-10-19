@@ -28,6 +28,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install build twine
+    - name: Check the version matches the tag
+      if: github.ref_type == 'tag'
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        VERSION=$(python -c 'import ast, sys; t = ast.parse(open("pytactl/__init__.py").read()); print(next(n.value.value for n in t.body if isinstance(n, ast.Assign) and n.targets[0].id == "__version__"))')
+        if [ "${TAG#v}" != "$VERSION" ] && [ "${TAG#v}.0" != "$VERSION" ]; then
+          echo "::error::Tag $TAG does not match pytactl.__version__ $VERSION; bump the version before tagging."
+          exit 1
+        fi
     - name: Build sdist and wheel
       run: python -m build
     - name: Check distributions
