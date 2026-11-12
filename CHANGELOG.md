@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proposes updates once a release is at least seven days old.
 - A `listcommands` subcommand lists the commands a debug board supports: the
   quick methods from its config script and its pin commands.
+- `examples/tac-api.py`, a client that runs one quick method or named command
+  through the service and exits non-zero with the service's error when it
+  fails.
 
 ### Changed
 

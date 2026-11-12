@@ -341,6 +341,14 @@ The REST API runs on `http://localhost:5000`. Example usage with curl:
     # Set a raw pin (e.g., bus A, pin 0)
     curl -X PUT "http://localhost:5000/<boardid>/pin/A0?value=1"
 
+A failed operation answers with an HTTP error and a JSON `message` saying what went wrong.
+[examples/tac-api.py](examples/tac-api.py) is a small client for scripts (such as LAVA power
+commands) that runs one quick method or named command and exits non-zero with that message
+when it fails:
+
+    examples/tac-api.py --serial <boardid> --command bootToEDL
+    examples/tac-api.py --serial <boardid> --pin reset --pin-value 1
+
 Note: REST API server runs in debug mode. Running with multiple concurrent threads may lead to unexpected behaviour.
 
 # License
